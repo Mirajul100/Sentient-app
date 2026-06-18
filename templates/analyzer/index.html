@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Sentient — How are you feeling?{% endblock %}
+
+{% block content %}
+<div class="space-y-section-gap pt-8 pb-32">
+
+  <!-- Welcome -->
+  <section>
+    <h2 class="text-headline-lg-mobile font-semibold text-on-surface mb-2">How are you feeling today?</h2>
+    <p class="text-body-md text-on-surface-variant">Share your thoughts — Sentient will listen and reflect.</p>
+  </section>
+
+  <!-- Input Card -->
+  <section>
+    <div id="inputCard" class="bg-white rounded-xl soft-shadow p-input-padding border border-outline-variant focus-within:ring-2 focus-within:ring-secondary-fixed transition-all duration-300">
+      <textarea
+        id="emotionInput"
+        class="w-full h-40 border-none focus:ring-0 p-0 text-body-xl placeholder:text-on-surface-variant/40 resize-none bg-transparent"
+        placeholder="Write or paste a sentence to detect emotions..."
+        maxlength="2000"
+      ></textarea>
+      <div class="flex items-center justify-between mt-3 pt-3 border-t border-outline-variant/30">
+        <span id="charCount" class="font-label-sm text-label-sm text-on-surface-variant/60">0 / 2000</span>
+        <button
+          id="analyzeBtn"
+          class="h-14 px-8 bg-secondary text-on-secondary rounded-xl font-label-sm text-label-sm shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Analyze
+          <span class="material-symbols-outlined text-sm">auto_awesome</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results Section -->
+  <section id="resultsSection" class="hidden opacity-0 translate-y-4 transition-custom space-y-section-gap">
+
+    <!-- Primary Emotion Glass Card -->
+    <div id="emotionCard" class="glass-card rounded-xl p-8 text-center relative overflow-hidden soft-shadow">
+      <div id="emotionGlow" class="absolute -top-12 -right-12 w-40 h-40 rounded-full blur-3xl opacity-30 transition-colors duration-700"></div>
+      <div class="relative z-10">
+        <span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-6 block">Detected Emotion</span>
+        <div id="emotionEmoji" class="text-7xl mb-4 inline-block transform hover:scale-110 transition-transform duration-300"></div>
+        <h3 id="emotionName" class="text-display font-bold mb-2"></h3>
+        <p id="emotionConfidence" class="font-label-sm text-label-sm text-on-surface-variant mb-1"></p>
+        <p id="emotionInsight" class="font-body-md text-on-surface-variant mt-2 max-w-xs mx-auto leading-relaxed"></p>
+      </div>
+    </div>
+
+    <!-- Detailed Breakdown -->
+    <div>
+      <h4 class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant mb-3 px-1">Detailed Breakdown</h4>
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 space-y-5 soft-shadow">
+        <div id="breakdownBars"></div>
+      </div>
+    </div>
+
+    <!-- Insight Panel -->
+    <div class="bg-secondary-fixed/30 border border-secondary-fixed-dim rounded-xl p-6">
+      <div class="flex gap-4">
+        <span class="material-symbols-outlined text-secondary text-3xl mt-0.5">auto_awesome</span>
+        <div>
+          <h5 class="font-headline-lg-mobile text-lg text-secondary mb-2">Sentient Insights</h5>
+          <p id="insightText" class="font-body-md text-on-surface-variant leading-relaxed"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save & Analyze Again -->
+    <div class="space-y-3 pb-4">
+      <button id="saveBtn"
+        class="w-full py-4 border border-secondary text-secondary rounded-xl font-label-sm text-label-sm hover:bg-secondary/5 transition-colors active:scale-95 flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined text-sm">bookmark</span>
+        Save to History
+      </button>
+      <button id="resetBtn"
+        class="w-full h-14 bg-secondary text-on-secondary rounded-xl font-label-sm text-label-sm shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined text-sm">refresh</span>
+        Analyze New Text
+      </button>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const input = document.getElementById('emotionInput');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const resetBtn = document.getElementById('resetBtn');
+const saveBtn = document.getElementById('saveBtn');
+const resultsSection = document.getElementById('resultsSection');
+const charCount = document.getElementById('charCount');
+
+let lastResult = null;
+let lastText = '';
+
+// Char counter
+input.addEventListener('input', () => {
+  const len = input.value.length;
+  charCount.textContent = `${len} / 2000`;
+  if (resultsSection && !resultsSection.classList.contains('hidden') && input.value.trim() === '') {
+    hideResults();
+  }
+});
+
+function hideResults() {
+  resultsSection.classList.add('opacity-0', 'translate-y-4');
+  setTimeout(() => resultsSection.classList.add('hidden'), 500);
+}
+
+function showResults(data) {
+  const { primary_emotion, primary_meta, confidence, breakdown } = data;
+
+  // Primary card
+  document.getElementById('emotionEmoji').textContent = primary_meta.emoji;
+  const nameEl = document.getElementById('emotionName');
+  nameEl.textContent = primary_emotion;
+  nameEl.className = `text-display font-bold mb-2 ${primary_meta.text_class}`;
+  document.getElementById('emotionConfidence').textContent = `${confidence}% confidence`;
+  document.getElementById('emotionInsight').textContent = primary_meta.insight;
+  document.getElementById('emotionGlow').style.backgroundColor = primary_meta.color;
+
+  // Breakdown bars
+  const barsContainer = document.getElementById('breakdownBars');
+  barsContainer.innerHTML = '';
+  breakdown.forEach(item => {
+    const pct = item.percentage;
+    const low = pct < 10;
+    barsContainer.innerHTML += `
+      <div class="space-y-1.5 ${low ? 'opacity-50' : ''}">
+        <div class="flex justify-between items-center">
+          <span class="font-label-sm text-label-sm text-on-surface flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full ${item.meta.bar_class}"></span>
+            ${item.emotion}
+          </span>
+          <span class="font-label-sm text-label-sm text-secondary">${pct}%</span>
+        </div>
+        <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+          <div class="emotion-bar h-full ${item.meta.bar_class} rounded-full" style="width:0%" data-target="${pct}%"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  // Insight
+  document.getElementById('insightText').textContent = primary_meta.insight;
+
+  // Show section
+  resultsSection.classList.remove('hidden');
+  void resultsSection.offsetWidth;
+  resultsSection.classList.remove('opacity-0', 'translate-y-4');
+
+  // Animate bars after paint
+  setTimeout(() => {
+    document.querySelectorAll('.emotion-bar').forEach(bar => {
+      bar.style.width = bar.dataset.target;
+    });
+  }, 200);
+
+  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+analyzeBtn.addEventListener('click', async () => {
+  const text = input.value.trim();
+  if (!text) {
+    input.focus();
+    document.getElementById('inputCard').classList.add('ring-2', 'ring-error');
+    setTimeout(() => document.getElementById('inputCard').classList.remove('ring-2', 'ring-error'), 1000);
+    return;
+  }
+
+  analyzeBtn.disabled = true;
+  analyzeBtn.innerHTML = `
+    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    Analyzing...
+  `;
+
+  try {
+    const resp = await fetch('/analyze/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      lastResult = data.result;
+      lastText = text;
+      showResults(data.result);
+    } else {
+      alert(data.error || 'Analysis failed.');
+    }
+  } catch (e) {
+    alert('Network error. Please try again.');
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = `Analyze <span class="material-symbols-outlined text-sm">auto_awesome</span>`;
+  }
+});
+
+resetBtn.addEventListener('click', () => {
+  input.value = '';
+  charCount.textContent = '0 / 2000';
+  hideResults();
+  input.focus();
+});
+
+saveBtn.addEventListener('click', () => {
+  saveBtn.innerHTML = `<span class="material-symbols-outlined text-sm">check</span> Saved!`;
+  saveBtn.classList.add('bg-secondary/10');
+  setTimeout(() => {
+    saveBtn.innerHTML = `<span class="material-symbols-outlined text-sm">bookmark</span> Save to History`;
+    saveBtn.classList.remove('bg-secondary/10');
+  }, 2000);
+});
+</script>
+{% endblock %}
