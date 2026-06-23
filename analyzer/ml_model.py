@@ -79,10 +79,10 @@ _model = None
 def load_models():
     global _vectorizer, _model
     if _vectorizer is None:
-        with open(os.path.join(BASE_DIR, 'count_vectorizer.pkl'), 'rb') as f:
+        with open(os.path.join(BASE_DIR, 'tfidf_vectorizer.pkl'), 'rb') as f:
             _vectorizer = pickle.load(f)
     if _model is None:
-        with open(os.path.join(BASE_DIR, 'lr_model.pkl'), 'rb') as f:
+        with open(os.path.join(BASE_DIR, 'logistic_regression_tfidf_model.pkl'), 'rb') as f:
             _model = pickle.load(f)
     return _vectorizer, _model
 
